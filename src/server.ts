@@ -22,7 +22,7 @@ export interface ServerConfig {
 }
 
 export function startServer(config: ServerConfig = {}) {
-  const port = config.port ?? Number(process.env.PORT) ?? 3000;
+  const port = config.port ?? (process.env.PORT ? Number(process.env.PORT) : 3000);
   const host = config.host ?? '0.0.0.0';
   const dbPath = config.database ?? process.env.DATABASE_PATH ?? ':memory:';
 

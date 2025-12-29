@@ -46,6 +46,7 @@
 export { FirestoreSql, CollectionQuery } from './sdk';
 export { startServer } from './server';
 export { createApi } from './api/routes';
+export { createGraphQLHandler, graphqlSchema } from './api/graphql';
 
 // Core exports
 export { DatabaseManager } from './core/database';

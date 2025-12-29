@@ -3,6 +3,7 @@
  */
 
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { z } from 'zod';
 import type { DatabaseManager } from '../core/database';
 import type { SchemaRegistry } from '../core/schema-registry';
@@ -15,6 +16,7 @@ import type {
   FieldType,
   SortSpec,
 } from '../core/types';
+import { createGraphQLHandler } from './graphql';
 
 // Zod schemas for validation
 const FieldTypeSchema = z.enum(['string', 'number', 'boolean', 'datetime']);
@@ -94,9 +96,31 @@ export interface ApiDependencies {
 export function createApi(deps: ApiDependencies): Hono {
   const app = new Hono();
 
+  // Enable CORS for cross-origin requests
+  app.use('*', cors());
+
   // Health check
   app.get('/health', (c) => {
     return c.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // ============ GraphQL ============
+  const graphqlHandler = createGraphQLHandler({
+    db: deps.db,
+    schemas: deps.schemas,
+    indexer: deps.indexer,
+    query: deps.query,
+  });
+
+  // Mount GraphQL at /graphql
+  app.on(['GET', 'POST'], '/graphql', async (c) => {
+    const response = await graphqlHandler.fetch(c.req.raw, {
+      db: deps.db,
+      schemas: deps.schemas,
+      indexer: deps.indexer,
+      query: deps.query,
+    });
+    return response;
   });
 
   // ============ Schema Routes ============

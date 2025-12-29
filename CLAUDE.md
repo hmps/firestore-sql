@@ -12,6 +12,7 @@ This service indexes Firestore documents into SQLite, enabling SQL-like querying
 - **Language**: TypeScript (fully typed)
 - **Database**: SQLite (via bun:sqlite)
 - **API Framework**: Hono
+- **GraphQL**: graphql-yoga
 - **Validation**: Zod
 - **Firestore**: firebase-admin
 
@@ -25,8 +26,9 @@ src/
 │   ├── document-indexer.ts # Document sync operations
 │   ├── query-engine.ts   # SQL query builder
 │   └── types.ts         # Type definitions
-├── api/            # REST API
-│   └── routes.ts        # Hono routes
+├── api/            # REST API & GraphQL
+│   ├── routes.ts        # Hono routes
+│   └── graphql.ts       # GraphQL schema & resolvers
 ├── firestore/      # Firestore integration
 │   └── client.ts        # Firebase Admin SDK wrapper
 ├── sdk.ts          # Main SDK client
@@ -110,6 +112,31 @@ curl -X POST http://localhost:3000/query/prospects \
   -H "Content-Type: application/json" \
   -d '{"filters": {"field": "score", "operator": ">=", "value": 80}}'
 ```
+
+### GraphQL API
+
+The server also exposes a GraphQL endpoint at `/graphql` with GraphiQL interface enabled.
+
+```bash
+# Query documents with filtering
+curl -X POST http://localhost:3000/graphql \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "{ documents(collection: \"prospects\", filters: [{field: \"score\", operator: GTE, value: 80}], sort: [{field: \"score\", direction: DESC}]) { documents total } }"
+  }'
+
+# Get all schemas
+curl -X POST http://localhost:3000/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ schemas { collection fields } }"}'
+```
+
+#### GraphQL Query Operators
+
+- `EQ` (=), `NE` (!=), `GT` (>), `GTE` (>=), `LT` (<), `LTE` (<=)
+- `LIKE` - Pattern matching
+- `IN`, `NOT_IN` - Array membership
+- `IS_NULL`, `IS_NOT_NULL` - Null checks
 
 ## Field Types
 
