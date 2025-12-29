@@ -1,0 +1,52 @@
+{
+  "name": "firestore-sql",
+  "version": "1.0.0",
+  "description": "A bridge between Firestore and SQL for advanced querying - like Typesense but for Firestore",
+  "module": "index.ts",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --hot src/server.ts",
+    "start": "bun run src/server.ts",
+    "example": "bun run examples/basic-usage.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": {
+      "import": "./index.ts",
+      "types": "./index.ts"
+    },
+    "./server": {
+      "import": "./src/server.ts",
+      "types": "./src/server.ts"
+    },
+    "./sdk": {
+      "import": "./src/sdk.ts",
+      "types": "./src/sdk.ts"
+    }
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "hono": "^4.11.3",
+    "zod": "^4.2.1"
+  },
+  "keywords": [
+    "firestore",
+    "sql",
+    "sqlite",
+    "query",
+    "search",
+    "index",
+    "typesense",
+    "bun"
+  ],
+  "license": "MIT"
+}
