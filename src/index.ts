@@ -53,7 +53,21 @@ export { DatabaseManager } from './core/database';
 export { SchemaRegistry } from './core/schema-registry';
 export { DocumentIndexer } from './core/document-indexer';
 export { QueryEngine } from './core/query-engine';
+export { SearchEngine } from './core/search';
+export { AggregationEngine } from './core/aggregations';
 export { FirestoreClient } from './firestore/client';
+
+// Queue exports
+export { IndexQueue } from './queue/index-queue';
+
+// Auth exports
+export { apiKeyAuth, generateApiKey } from './auth/api-key';
+
+// Client SDK exports
+export {
+  FirestoreSqlClient,
+  createCollectionClient,
+} from './client';
 
 // Type exports
 export type {
@@ -76,3 +90,27 @@ export type { FirestoreConfig } from './firestore/client';
 export type { SchemaInput } from './core/schema-registry';
 export type { FirestoreSqlConfig } from './sdk';
 export type { ServerConfig } from './server';
+
+// Search types
+export type { SearchResult, SearchOptions } from './core/search';
+
+// Aggregation types
+export type {
+  AggregateFunction,
+  AggregateField,
+  AggregateQuery,
+  AggregateResult,
+} from './core/aggregations';
+
+// Queue types
+export type { IndexJob, QueueConfig } from './queue/index-queue';
+
+// Auth types
+export type { ApiKeyConfig } from './auth/api-key';
+
+// Client types
+export type {
+  ClientConfig,
+  QueryOptions,
+  QueryResult as ClientQueryResult,
+} from './client';

@@ -71,6 +71,72 @@ export class SchemaRegistry {
     return this.db.deleteSchema(collection);
   }
 
+  /**
+   * Infer schema from a document
+   * Useful for auto-creating schemas from first document
+   */
+  inferSchema(data: Record<string, unknown>): Record<string, FieldDefinition> {
+    const fields: Record<string, FieldDefinition> = {};
+
+    for (const [key, value] of Object.entries(data)) {
+      // Skip internal fields
+      if (key.startsWith('_')) continue;
+
+      let type: FieldType = 'string';
+
+      if (value === null || value === undefined) {
+        type = 'string'; // Default to string for null values
+      } else if (typeof value === 'number') {
+        type = 'number';
+      } else if (typeof value === 'boolean') {
+        type = 'boolean';
+      } else if (value instanceof Date) {
+        type = 'datetime';
+      } else if (typeof value === 'object' && 'toDate' in value) {
+        // Firestore Timestamp
+        type = 'datetime';
+      } else if (typeof value === 'string') {
+        // Check if it looks like a date string
+        if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+          type = 'datetime';
+        } else {
+          type = 'string';
+        }
+      }
+
+      fields[key] = {
+        type,
+        nullable: true,
+        indexed: false,
+      };
+    }
+
+    return fields;
+  }
+
+  /**
+   * Register schema by inferring from a document
+   */
+  registerFromDocument(
+    collection: string,
+    data: Record<string, unknown>
+  ): CollectionSchema {
+    const fields = this.inferSchema(data);
+    return this.register({ collection, fields });
+  }
+
+  /**
+   * Get or create schema - creates from document if doesn't exist
+   */
+  getOrCreate(
+    collection: string,
+    data: Record<string, unknown>
+  ): CollectionSchema {
+    const existing = this.get(collection);
+    if (existing) return existing;
+    return this.registerFromDocument(collection, data);
+  }
+
   /** Validate data against a schema */
   validate(
     collection: string,

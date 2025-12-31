@@ -7,6 +7,8 @@ import { DatabaseManager } from './core/database';
 import { SchemaRegistry } from './core/schema-registry';
 import { DocumentIndexer } from './core/document-indexer';
 import { QueryEngine } from './core/query-engine';
+import { SearchEngine } from './core/search';
+import { AggregationEngine } from './core/aggregations';
 import { FirestoreClient, type FirestoreConfig } from './firestore/client';
 import { createApi } from './api/routes';
 
@@ -19,6 +21,8 @@ export interface ServerConfig {
   database?: string;
   /** Firestore configuration */
   firestore?: FirestoreConfig;
+  /** API keys for authentication (if empty, auth is disabled) */
+  apiKeys?: string[];
 }
 
 export function startServer(config: ServerConfig = {}) {
@@ -31,14 +35,19 @@ export function startServer(config: ServerConfig = {}) {
   const schemas = new SchemaRegistry(db);
   const indexer = new DocumentIndexer(db, schemas);
   const query = new QueryEngine(db, schemas);
+  const search = new SearchEngine(db, schemas);
+  const aggregations = new AggregationEngine(db, schemas);
 
   let firestore: FirestoreClient | undefined;
   if (config.firestore) {
     firestore = new FirestoreClient(config.firestore);
   }
 
+  // Get API keys from config or environment
+  const apiKeys = config.apiKeys ?? (process.env.API_KEYS ? process.env.API_KEYS.split(',') : undefined);
+
   // Create API
-  const app = createApi({ db, schemas, indexer, query, firestore });
+  const app = createApi({ db, schemas, indexer, query, search, aggregations, firestore, apiKeys });
 
   // Start server
   const server = serve({
@@ -55,6 +64,8 @@ export function startServer(config: ServerConfig = {}) {
     schemas,
     indexer,
     query,
+    search,
+    aggregations,
     firestore,
     close: () => {
       db.close();

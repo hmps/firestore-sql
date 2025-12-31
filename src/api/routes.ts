@@ -10,6 +10,9 @@ import type { SchemaRegistry } from '../core/schema-registry';
 import type { DocumentIndexer } from '../core/document-indexer';
 import type { QueryEngine } from '../core/query-engine';
 import type { FirestoreClient } from '../firestore/client';
+import type { SearchEngine } from '../core/search';
+import type { AggregationEngine } from '../core/aggregations';
+import type { IndexQueue } from '../queue/index-queue';
 import type {
   FilterCondition,
   FilterGroup,
@@ -17,6 +20,7 @@ import type {
   SortSpec,
 } from '../core/types';
 import { createGraphQLHandler } from './graphql';
+import { apiKeyAuth } from '../auth/api-key';
 
 // Zod schemas for validation
 const FieldTypeSchema = z.enum(['string', 'number', 'boolean', 'datetime']);
@@ -91,6 +95,10 @@ export interface ApiDependencies {
   indexer: DocumentIndexer;
   query: QueryEngine;
   firestore?: FirestoreClient;
+  search?: SearchEngine;
+  aggregations?: AggregationEngine;
+  queue?: IndexQueue;
+  apiKeys?: string[];
 }
 
 export function createApi(deps: ApiDependencies): Hono {
@@ -98,6 +106,14 @@ export function createApi(deps: ApiDependencies): Hono {
 
   // Enable CORS for cross-origin requests
   app.use('*', cors());
+
+  // API key authentication (if configured)
+  if (deps.apiKeys && deps.apiKeys.length > 0) {
+    app.use('*', apiKeyAuth({
+      apiKeys: deps.apiKeys,
+      excludePaths: ['/health', '/graphql'],
+    }));
+  }
 
   // Health check
   app.get('/health', (c) => {
@@ -398,6 +414,221 @@ export function createApi(deps: ApiDependencies): Hono {
     const collection = c.req.query('collection');
     const errors = deps.indexer.getErroredDocuments(collection);
     return c.json({ errors });
+  });
+
+  // ============ Search Routes ============
+
+  // Full-text search
+  app.post('/search/:collection', async (c) => {
+    const { collection } = c.req.param();
+
+    if (!deps.search) {
+      return c.json({ error: 'Search not configured' }, 400);
+    }
+
+    try {
+      const body = await c.req.json();
+      const { query, limit, offset, highlight } = body;
+
+      if (!query) {
+        return c.json({ error: 'Query is required' }, 400);
+      }
+
+      const result = deps.search.search(collection, query, { limit, offset, highlight });
+      return c.json(result);
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        400
+      );
+    }
+  });
+
+  // Create search index
+  app.post('/search/:collection/index', (c) => {
+    const { collection } = c.req.param();
+
+    if (!deps.search) {
+      return c.json({ error: 'Search not configured' }, 400);
+    }
+
+    try {
+      deps.search.createSearchIndex(collection);
+      return c.json({ success: true, message: 'Search index created' });
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        400
+      );
+    }
+  });
+
+  // Check if search index exists
+  app.get('/search/:collection/index', (c) => {
+    const { collection } = c.req.param();
+
+    if (!deps.search) {
+      return c.json({ error: 'Search not configured' }, 400);
+    }
+
+    const exists = deps.search.hasSearchIndex(collection);
+    return c.json({ exists });
+  });
+
+  // ============ Aggregation Routes ============
+
+  // Run aggregation query
+  app.post('/aggregate/:collection', async (c) => {
+    const { collection } = c.req.param();
+
+    if (!deps.aggregations) {
+      return c.json({ error: 'Aggregations not configured' }, 400);
+    }
+
+    try {
+      const body = await c.req.json();
+      const result = deps.aggregations.aggregate({
+        collection,
+        ...body,
+      });
+      return c.json(result);
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        400
+      );
+    }
+  });
+
+  // Get stats for a field
+  app.post('/aggregate/:collection/stats', async (c) => {
+    const { collection } = c.req.param();
+
+    if (!deps.aggregations) {
+      return c.json({ error: 'Aggregations not configured' }, 400);
+    }
+
+    try {
+      const body = await c.req.json();
+      const { field, filters } = body;
+
+      if (!field) {
+        return c.json({ error: 'Field is required' }, 400);
+      }
+
+      const result = deps.aggregations.stats(collection, field, filters);
+      return c.json(result);
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        400
+      );
+    }
+  });
+
+  // ============ Queue Routes ============
+
+  // Add document to index queue
+  app.post('/queue/:collection/:docId', async (c) => {
+    const { collection, docId } = c.req.param();
+
+    if (!deps.queue) {
+      return c.json({ error: 'Queue not configured' }, 400);
+    }
+
+    try {
+      const body = await c.req.json();
+      const jobId = await deps.queue.addIndexJob(collection, docId, body);
+      return c.json({ jobId, status: 'queued' });
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        400
+      );
+    }
+  });
+
+  // Add bulk documents to queue
+  app.post('/queue/:collection', async (c) => {
+    const { collection } = c.req.param();
+
+    if (!deps.queue) {
+      return c.json({ error: 'Queue not configured' }, 400);
+    }
+
+    try {
+      const body = await c.req.json();
+      const jobId = await deps.queue.addBulkJob(collection, body);
+      return c.json({ jobId, status: 'queued' });
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        400
+      );
+    }
+  });
+
+  // Get queue stats
+  app.get('/queue/stats', async (c) => {
+    if (!deps.queue) {
+      return c.json({ error: 'Queue not configured' }, 400);
+    }
+
+    try {
+      const stats = await deps.queue.getStats();
+      return c.json(stats);
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        400
+      );
+    }
+  });
+
+  // Get job status
+  app.get('/queue/job/:jobId', async (c) => {
+    const { jobId } = c.req.param();
+
+    if (!deps.queue) {
+      return c.json({ error: 'Queue not configured' }, 400);
+    }
+
+    try {
+      const job = await deps.queue.getJob(jobId);
+      if (!job) {
+        return c.json({ error: 'Job not found' }, 404);
+      }
+      return c.json({
+        id: job.id,
+        data: job.data,
+        state: await job.getState(),
+        progress: job.progress,
+        attemptsMade: job.attemptsMade,
+      });
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        400
+      );
+    }
+  });
+
+  // ============ Schema Inference Route ============
+
+  // Infer schema from document
+  app.post('/schemas/:collection/infer', async (c) => {
+    const { collection } = c.req.param();
+
+    try {
+      const body = await c.req.json();
+      const schema = deps.schemas.registerFromDocument(collection, body);
+      return c.json({ schema }, 201);
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        400
+      );
+    }
   });
 
   return app;
