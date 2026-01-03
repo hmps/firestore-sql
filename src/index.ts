@@ -69,6 +69,12 @@ export {
   createCollectionClient,
 } from './client';
 
+// Multi-tenant exports
+export { TenantManager } from './tenants/tenant-manager';
+export { tenantMiddleware, getTenant } from './tenants/tenant-middleware';
+export { createMultiTenantApi } from './api/multi-tenant-routes';
+export { startMultiTenantServer } from './multi-tenant-server';
+
 // Type exports
 export type {
   CollectionSchema,
@@ -114,3 +120,9 @@ export type {
   QueryOptions,
   QueryResult as ClientQueryResult,
 } from './client';
+
+// Multi-tenant types
+export type { TenantConfig, TenantContext } from './tenants/tenant-manager';
+export type { TenantMiddlewareConfig } from './tenants/tenant-middleware';
+export type { MultiTenantApiConfig } from './api/multi-tenant-routes';
+export type { MultiTenantServerConfig } from './multi-tenant-server';

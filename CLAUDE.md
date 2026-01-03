@@ -152,6 +152,48 @@ curl -X POST http://localhost:3000/graphql \
 - `IN`, `NOT IN` - Value in array
 - `IS NULL`, `IS NOT NULL` - Null checks
 
+## Multi-Tenant Mode
+
+For SaaS applications, use multi-tenant mode where each customer gets their own isolated SQLite database:
+
+```typescript
+import { startMultiTenantServer } from 'firestore-sql';
+
+startMultiTenantServer({
+  dataDir: './data/tenants',  // Each tenant gets: ./data/tenants/{tenantId}.db
+  apiKeys: ['your-api-key'],  // Optional API key auth
+});
+```
+
+### Multi-Tenant API Usage
+
+```bash
+# List all tenants
+curl http://localhost:3000/tenants
+
+# Tenant-scoped operations (via header)
+curl -X POST http://localhost:3000/schemas/products \
+  -H "x-tenant-id: customer-123" \
+  -H "Content-Type: application/json" \
+  -d '{"fields": {"name": "string", "price": "number"}}'
+
+# Query a tenant's data
+curl -X POST http://localhost:3000/query/products \
+  -H "x-tenant-id: customer-123" \
+  -H "Content-Type: application/json" \
+  -d '{"filters": {"field": "price", "operator": ">=", "value": 100}}'
+
+# Delete a tenant and all their data
+curl -X DELETE http://localhost:3000/tenants/customer-123
+```
+
+### Tenant ID Resolution
+
+Tenant ID can be provided via:
+1. `x-tenant-id` header
+2. `tenant_id` query parameter
+3. Path parameter (if configured)
+
 ## Bun Development Notes
 
 - Use `bun:sqlite` for SQLite (not better-sqlite3)
